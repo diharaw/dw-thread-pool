@@ -1,12 +1,17 @@
 # dwThreadPool
 
-## What is it?
-
 A simple, header-only, dependency-free, C++ 11 based ThreadPool library.
 
 ## Features
 
-## Sample
+* C++ 11
+* Header only. Can be easily integrated into any codebase
+* No external dependencies
+* Implicit load balancing due to global task queue
+* No dynamic allocations for the user
+* Stefan Reinalter's [Delegates](https://blog.molecular-matters.com/2011/09/19/generic-type-safe-delegates-and-events-in-c/).
+
+## Tutorial
 
 ```cpp
 #include <thread_pool.hpp>
@@ -52,9 +57,13 @@ int main()
 }
 ```
 
-## Build Instructions
+## Remotery Screenshot of Example
 
+![alt text](https://github.com/diharaw/dwThreadPool/raw/master/doc/screenshot.png "Remotery Screenshot")
 
+## Building the Example
+
+The example project can be built using the [CMake](https://cmake.org/) build system generator. Plenty of tutorials around for that.
 
 ## License
 
