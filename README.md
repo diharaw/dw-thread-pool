@@ -9,7 +9,7 @@ A simple, header-only, dependency-free, C++ 11 based ThreadPool library.
 * No external dependencies
 * Implicit load balancing due to global task queue
 * No dynamic allocations for the user
-* Stefan Reinalter's [Delegates](https://blog.molecular-matters.com/2011/09/19/generic-type-safe-delegates-and-events-in-c/).
+* Stefan Reinalter's [Delegates](https://blog.molecular-matters.com/2011/09/19/generic-type-safe-delegates-and-events-in-c/)
 * Supports any C++ 11 compiler (Tested on AppleClang 8.0, MSVC 14.0)
 
 ## Tutorial
@@ -65,24 +65,3 @@ int main()
 ## Building the Example
 
 The example project can be built using the [CMake](https://cmake.org/) build system generator. Plenty of tutorials around for that.
-
-## License
-
-```
-Copyright (c) 2016 Dihara Wijetunga
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the "Software"), to deal in the Software without restriction, 
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, 
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial
-portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT 
-LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
