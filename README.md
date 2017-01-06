@@ -10,6 +10,7 @@ A simple, header-only, dependency-free, C++ 11 based ThreadPool library.
 * Implicit load balancing due to global task queue
 * No dynamic allocations for the user
 * Stefan Reinalter's [Delegates](https://blog.molecular-matters.com/2011/09/19/generic-type-safe-delegates-and-events-in-c/).
+* Supports any C++ 11 compiler (Tested on AppleClang 8.0, MSVC 14.0)
 
 ## Tutorial
 
