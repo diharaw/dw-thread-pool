@@ -84,11 +84,11 @@ namespace dw
         {
             while (true)
             {
-                if (concurrent_queue::empty(_queue))
+                //if (concurrent_queue::empty(_queue))
                 {
                     // lock thread
                     std::unique_lock<std::mutex> lock(_mutex);
-                    //
+                    
                     _condition.wait(lock, [this]
                                     {
                                         return (!concurrent_queue::empty(_queue) || _shutdown) ;
@@ -97,16 +97,18 @@ namespace dw
                     if (_shutdown)
                         return;
                 }
-                else
+                //else
                 {
                     // pop front item
                     Task task = concurrent_queue::pop(_queue);
                     
                     // execute task
                     task._function.Invoke(&task._data);
-                    _pending_tasks--;
                     
-                    _condition.notify_one();
+                    if(_pending_tasks > 0)
+                        _pending_tasks--;
+                    
+                    _condition.notify_all();
                 }
             }
         }

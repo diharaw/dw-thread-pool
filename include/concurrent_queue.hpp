@@ -10,11 +10,11 @@ namespace dw
     template<typename T, size_t N>
     struct ConcurrentQueue
     {
-        uint16_t				 _front;
-        uint16_t				 _back;
-        uint16_t				 _size;
-        std::mutex			 _mutex;
-        std::array<T, N> _elements;
+        uint16_t                 _front;
+        uint16_t                 _back;
+        uint16_t                 _size;
+        std::mutex			     _mutex;
+        std::array<T, N>         _elements;
     };
     
     namespace concurrent_queue
@@ -43,7 +43,7 @@ namespace dw
             
             queue._elements[queue._front] = element;
             
-            if ((queue._front == queue._size - 1) && (queue._back > 0))
+            if ((queue._front == N - 1) && (queue._back > 0))
                 queue._front = 0;
             else
                 queue._front++;
@@ -59,7 +59,7 @@ namespace dw
             
             uint16_t index = queue._back;
             
-            if (queue._back == queue._size - 1)
+            if (queue._back == N - 1)
                 queue._back = 0;
             else
                 queue._back++;
