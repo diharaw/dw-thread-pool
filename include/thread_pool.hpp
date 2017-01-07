@@ -7,7 +7,7 @@
 #include <atomic>
 #include <condition_variable>
 
-#define TASK_SIZE_BYTES 48
+#define TASK_SIZE_BYTES 100
 
 namespace dw
 {
@@ -16,13 +16,13 @@ namespace dw
     struct Task
     {
         WorkerFunction _function;
-        char						 _data[TASK_SIZE_BYTES];
+        char		   _data[TASK_SIZE_BYTES];
     };
     
     template <typename T>
     inline T* task_data(Task& task)
     {
-        return static_cast<T*>(&task._data[0]);
+        return (T*)(&task._data[0]);
     }
     
     template <size_t WorkerCount = 4, size_t QueueSize = 1024>
@@ -60,6 +60,7 @@ namespace dw
         
         inline void enqueue(Task& task)
         {
+            std::lock_guard<std::mutex> lock(_mutex);
             concurrent_queue::push(_queue, task);
             _pending_tasks++;
             _condition.notify_one();
@@ -114,13 +115,13 @@ namespace dw
         }
         
     private:
-        bool									  _shutdown;
-        uint16_t							  _num_logical_threads;
-        TaskQueue						  _queue;
-        std::vector<std::thread> _worker_threads;
-        std::mutex						  _mutex;
+        bool					  _shutdown;
+        uint16_t				  _num_logical_threads;
+        TaskQueue				  _queue;
+        std::vector<std::thread>  _worker_threads;
+        std::mutex				  _mutex;
         std::condition_variable   _condition;
-        std::atomic_int				  _pending_tasks;
+        std::atomic_int			  _pending_tasks;
         
     };
 }
