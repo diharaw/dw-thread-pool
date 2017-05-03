@@ -139,26 +139,27 @@ namespace dw
     class ThreadPool
     {
     public:
-        ThreadPool(uint32_t workers = 0)
+        ThreadPool()
         {
             _shutdown = false;
             
             // get number of logical threads on CPU
             _num_logical_threads = std::thread::hardware_concurrency();
             
-            if(workers == 0)
-                _num_worker_threads = _num_logical_threads - 1;
-            else
-                _num_worker_threads = workers;
+            _num_worker_threads = _num_logical_threads - 1;
             
-            if(workers == 0)
-                _num_worker_threads = _num_logical_threads - 1;
+            initialize();
+        }
+        
+        ThreadPool(uint32_t workers)
+        {
+            _shutdown = false;
             
-            // spawn worker threads
-            _worker_threads = new WorkerThread[_num_worker_threads];
+            // get number of logical threads on CPU
+            _num_logical_threads = std::thread::hardware_concurrency();
+            _num_worker_threads = workers;
             
-            for (uint32_t i = 0; i < _num_worker_threads; i++)
-                _worker_threads[i].initialize(&_queue);
+            initialize();
         }
         
         ~ThreadPool()
@@ -204,6 +205,16 @@ namespace dw
         inline uint32_t get_num_worker_threads()
         {
             return _num_worker_threads;
+        }
+        
+    private:
+        void initialize()
+        {
+            // spawn worker threads
+            _worker_threads = new WorkerThread[_num_worker_threads];
+            
+            for (uint32_t i = 0; i < _num_worker_threads; i++)
+                _worker_threads[i].initialize(&_queue);
         }
         
     private:
