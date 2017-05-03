@@ -32,8 +32,10 @@ void my_task(void* args)
 
 int main() 
 {
-    // create thread pool instance with number of worker threads and queue size as template parameters.
-    dw::ThreadPool<4, 100> thread_pool;
+    // create thread pool instance. Pass in the number of worker threads as the constructor parameter. Passing in 0 will
+    // create (N - 1) number of worker threads, with N being the number of hardware threads.
+    dw::ThreadPool thread_pool;
+    dw::ThreadPool custom_worker_count = dw::ThreadPool(2);
     
     // create task on the stack. no dynamic allocations required.
     dw::Task task;
