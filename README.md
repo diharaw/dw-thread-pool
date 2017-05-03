@@ -32,8 +32,8 @@ void my_task(void* args)
 
 int main() 
 {
-    // create thread pool instance. Pass in the number of worker threads as the constructor parameter. Passing in 0 will
-    // create (N - 1) number of worker threads, with N being the number of hardware threads.
+    // create thread pool instance. Pass in the number of worker threads as the constructor parameter. 
+    // Passing in 0 will create (N - 1) number of worker threads, with N being the number of hardware threads.
     dw::ThreadPool thread_pool;
     dw::ThreadPool custom_worker_count = dw::ThreadPool(2);
     
