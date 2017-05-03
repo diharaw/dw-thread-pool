@@ -38,7 +38,7 @@ void task3_function(void* data)
 	std::this_thread::sleep_for(std::chrono::seconds(1 + rand()));
 }
 
-void test_case_1(dw::ThreadPool<>& tp)
+void test_case_1(dw::ThreadPool& tp)
 {
     std::cout << "*****************************************" << std::endl;
     std::cout << "TEST CASE 1" << std::endl;
@@ -56,7 +56,7 @@ void test_case_1(dw::ThreadPool<>& tp)
 	tp.wait();
 }
 
-void test_case_2(dw::ThreadPool<>& tp)
+void test_case_2(dw::ThreadPool& tp)
 {
     std::cout << "*****************************************" << std::endl;
     std::cout << "TEST CASE 2" << std::endl;
@@ -74,7 +74,7 @@ void test_case_2(dw::ThreadPool<>& tp)
 	tp.wait();
 }
 
-void test_case_3(dw::ThreadPool<>& tp)
+void test_case_3(dw::ThreadPool& tp)
 {
 	dw::Task task;
 
@@ -99,7 +99,7 @@ int main()
 	Remotery* rmt;
 	rmt_CreateGlobalInstance(&rmt);
 
-	dw::ThreadPool<> thread_pool;
+	dw::ThreadPool thread_pool;
 
     test_case_2(thread_pool);
     test_case_1(thread_pool);

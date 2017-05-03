@@ -1,13 +1,16 @@
 #pragma once
 
-#include "concurrent_queue.hpp"
 #include "delegate.hpp"
+#include "semaphore.hpp"
 #include <thread>
 #include <vector>
 #include <atomic>
 #include <condition_variable>
 
-#define TASK_SIZE_BYTES 100
+#define MAX_TASKS 1024u
+#define MASK MAX_TASKS - 1u
+
+#define TASK_SIZE_BYTES 128
 
 namespace dw
 {
@@ -16,7 +19,7 @@ namespace dw
     struct Task
     {
         WorkerFunction _function;
-        char		   _data[TASK_SIZE_BYTES];
+        char           _data[TASK_SIZE_BYTES];
     };
     
     template <typename T>
@@ -25,103 +28,190 @@ namespace dw
         return (T*)(&task._data[0]);
     }
     
-    template <size_t WorkerCount = 4, size_t QueueSize = 1024>
-    class ThreadPool
+    class WorkQueue
     {
-        using TaskQueue = ConcurrentQueue<Task, QueueSize>;
+    private:
+        std::mutex _critical_section;
+        Task       _task_pool[MAX_TASKS];
+        Task*      _task_queue[MAX_TASKS];
+        uint32_t   _front;
+        uint32_t   _back;
+        uint32_t   _num_tasks;
         
     public:
-        ThreadPool()
+        WorkQueue()
+        {
+            _num_tasks = 0;
+            _front = 0;
+            _back = 0;
+        }
+        
+        ~WorkQueue()
+        {
+            
+        }
+        
+        Task* allocate()
+        {
+            uint32_t task_index = _num_tasks++;
+            return &_task_pool[task_index & (MAX_TASKS - 1u)];
+        }
+        
+        void push(Task* task)
+        {
+            std::lock_guard<std::mutex> lock(_critical_section);
+            
+            _task_queue[_back & MASK] = task;
+            ++_back;
+        }
+        
+        Task* pop()
+        {
+            std::lock_guard<std::mutex> lock(_critical_section);
+            
+            const uint32_t job_count = _back - _front;
+            if (job_count <= 0)
+                return nullptr;
+            
+            --_back;
+            return _task_queue[_back & MASK];
+        }
+        
+        bool empty()
+        {
+            return (_front == 0 && _back == 0);
+        }
+    };
+    
+    class WorkerThread
+    {
+    private:
+        Semaphore _wakeup;
+        Semaphore _done;
+        std::thread _thread;
+        bool      _shutdown;
+        
+    public:
+        WorkerThread()
         {
             _shutdown = false;
-            _pending_tasks = 0;
-            
-            // clear queue
-            concurrent_queue::clear(_queue);
+        }
+        
+        ~WorkerThread()
+        {
+        }
+        
+        void initialize(WorkQueue* queue)
+        {
+            _thread = std::thread(&WorkerThread::worker, this, queue);
+        }
+        
+        void shutdown()
+        {
+            _shutdown = true;
+            wakeup();
+            _thread.join();
+        }
+        
+        void wakeup()
+        {
+            _wakeup.notify();
+        }
+        
+    private:
+        void worker(WorkQueue* queue)
+        {
+            while(!_shutdown)
+            {
+                Task* task = queue->pop();
+                
+                if(!task)
+                {
+                    _done.notify();
+                    _wakeup.wait();
+                }
+                else
+                    task->_function.Invoke(task->_data);
+            }
+        }
+    };
+    
+    class ThreadPool
+    {
+    public:
+        ThreadPool(uint32_t workers = 0)
+        {
+            _shutdown = false;
             
             // get number of logical threads on CPU
             _num_logical_threads = std::thread::hardware_concurrency();
             
+            if(workers == 0)
+                _num_worker_threads = _num_logical_threads - 1;
+            else
+                _num_worker_threads = workers;
+            
+            if(workers == 0)
+                _num_worker_threads = _num_logical_threads - 1;
+            
             // spawn worker threads
-            for (int i = 0; i < WorkerCount; i++)
-                _worker_threads.push_back(std::thread(&ThreadPool::worker_function, this, i));
+            _worker_threads = new WorkerThread[_num_worker_threads];
+            
+            for (uint32_t i = 0; i < _num_worker_threads; i++)
+                _worker_threads[i].initialize(&_queue);
         }
         
         ~ThreadPool()
         {
-            _mutex.lock();
-            _shutdown = true;
-            _condition.notify_all();
-            _mutex.unlock();
+            for (uint32_t i = 0; i < _num_worker_threads; i++)
+                _worker_threads[i].shutdown();
             
-            for (auto& thread : _worker_threads)
-                thread.join();
+            delete[] _worker_threads;
         }
         
         inline void enqueue(Task& task)
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            concurrent_queue::push(_queue, task);
-            _pending_tasks++;
-            _condition.notify_one();
+            Task* task_ptr = _queue.allocate();
+            task_ptr->_function = task._function;
+            memcpy(&task_ptr->_data[0], &task._data[0], TASK_SIZE_BYTES);
+            
+            _queue.push(task_ptr);
+            
+            for(uint32_t i = 0; i < _num_worker_threads; i++)
+            {
+                WorkerThread& thread = _worker_threads[i];
+                thread.wakeup();
+            }
         }
         
         inline void wait()
         {
-            std::unique_lock<std::mutex> lock(_mutex);
-            _condition.wait(lock, [this]
-                            {
-                                return (_pending_tasks == 0);
-                            });
+            while(!_queue.empty())
+            {
+                Task* task = _queue.pop();
+                
+                if(task)
+                    task->_function.Invoke(task->_data);
+            }
         }
         
-        inline size_t get_num_logical_threads()
+        
+        inline uint32_t get_num_logical_threads()
         {
             return _num_logical_threads;
         }
         
-    private:
-        inline void worker_function(int index)
+        inline uint32_t get_num_worker_threads()
         {
-            while (true)
-            {
-                //if (concurrent_queue::empty(_queue))
-                {
-                    // lock thread
-                    std::unique_lock<std::mutex> lock(_mutex);
-                    
-                    _condition.wait(lock, [this]
-                                    {
-                                        return (!concurrent_queue::empty(_queue) || _shutdown) ;
-                                    });
-                    
-                    if (_shutdown)
-                        return;
-                }
-                //else
-                {
-                    // pop front item
-                    Task task = concurrent_queue::pop(_queue);
-                    
-                    // execute task
-                    task._function.Invoke(&task._data);
-                    
-                    if(_pending_tasks > 0)
-                        _pending_tasks--;
-                    
-                    _condition.notify_all();
-                }
-            }
+            return _num_worker_threads;
         }
         
     private:
         bool					  _shutdown;
-        uint16_t				  _num_logical_threads;
-        TaskQueue				  _queue;
-        std::vector<std::thread>  _worker_threads;
-        std::mutex				  _mutex;
-        std::condition_variable   _condition;
-        std::atomic_int			  _pending_tasks;
-        
+        uint32_t				  _num_logical_threads;
+        WorkQueue                 _queue;
+        WorkerThread*             _worker_threads;
+        uint32_t                  _num_worker_threads;
     };
+
 }
