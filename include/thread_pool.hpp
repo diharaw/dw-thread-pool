@@ -20,6 +20,7 @@ namespace dw
     {
         WorkerFunction _function;
         char           _data[TASK_SIZE_BYTES];
+        uint16_t       _num_completed;
     };
     
     template <typename T>
@@ -37,11 +38,13 @@ namespace dw
         uint32_t   _front;
         uint32_t   _back;
         uint32_t   _num_tasks;
+        uint32_t _num_pending_tasks;
         
     public:
         WorkQueue()
         {
             _num_tasks = 0;
+            _num_pending_tasks = 0;
             _front = 0;
             _back = 0;
         }
@@ -63,6 +66,7 @@ namespace dw
             
             _task_queue[_back & MASK] = task;
             ++_back;
+            _num_pending_tasks++;
         }
         
         Task* pop()
@@ -75,6 +79,22 @@ namespace dw
             
             --_back;
             return _task_queue[_back & MASK];
+        }
+        
+        void finish_task(Task* task)
+        {
+            task->_function.Invoke(task->_data);
+            
+            if(task->_num_completed > 0)
+                task->_num_completed--;
+            
+            if(_num_pending_tasks > 0)
+                _num_pending_tasks--;
+        }
+        
+        bool has_pending_tasks()
+        {
+            return (_num_pending_tasks != 0);
         }
         
         bool empty()
@@ -131,7 +151,7 @@ namespace dw
                     _wakeup.wait();
                 }
                 else
-                    task->_function.Invoke(task->_data);
+                    queue->finish_task(task);
             }
         }
     };
@@ -170,32 +190,48 @@ namespace dw
             delete[] _worker_threads;
         }
         
-        inline void enqueue(Task& task)
+        inline Task* allocate()
         {
             Task* task_ptr = _queue.allocate();
-            task_ptr->_function = task._function;
-            memcpy(&task_ptr->_data[0], &task._data[0], TASK_SIZE_BYTES);
-            
-            _queue.push(task_ptr);
-            
-            for(uint32_t i = 0; i < _num_worker_threads; i++)
+            task_ptr->_num_completed = 1;
+            return task_ptr;
+        }
+        
+        inline void enqueue(Task* task)
+        {
+            if(task)
             {
-                WorkerThread& thread = _worker_threads[i];
-                thread.wakeup();
+                _queue.push(task);
+                
+                for(uint32_t i = 0; i < _num_worker_threads; i++)
+                {
+                    WorkerThread& thread = _worker_threads[i];
+                    thread.wakeup();
+                }
             }
         }
         
-        inline void wait()
+        inline void wait_for_all()
         {
-            while(!_queue.empty())
+            while(_queue.has_pending_tasks())
             {
                 Task* task = _queue.pop();
                 
                 if(task)
-                    task->_function.Invoke(task->_data);
+                    _queue.finish_task(task);
             }
         }
         
+        inline void wait_for_one(Task* pending_task)
+        {
+            while(pending_task->_num_completed > 0)
+            {
+                Task* task = _queue.pop();
+                
+                if(task)
+                    _queue.finish_task(task);
+            }
+        }
         
         inline uint32_t get_num_logical_threads()
         {
