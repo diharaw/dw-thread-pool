@@ -8,6 +8,10 @@
 #define TEST_CASE_2_NUM_TASKS 29
 #define TEST_CASE_3_NUM_TASKS 1000
 
+#define TEST_CASE_4_ITERATIONS 5
+#define TEST_CASE_5_ITERATIONS 5
+
+
 int num_completed = 0;
 std::mutex global_mutex;
 
@@ -116,36 +120,71 @@ void test_case_3(dw::ThreadPool& tp)
 	tp.wait_for_all();
 }
 
-void test_case_4(dw::ThreadPool& tp)
+void test_case_4_continuations(dw::ThreadPool& tp)
 {
+	std::cout << "*****************************************" << std::endl;
+	std::cout << "TEST CASE 4 - CONTINUATIONS" << std::endl;
+	std::cout << "*****************************************" << std::endl;
+
     dw::Task* task1;
     dw::Task* task2;
     dw::Task* task3;
     dw::Task* task4;
-    dw::Task* task5;
+    dw::Task* task2_cont_1;
+	dw::Task* task2_cont_2;
+	dw::Task* task2_cont_3;
     
     task1 = tp.allocate();
     task2 = tp.allocate();
     task3 = tp.allocate();
     task4 = tp.allocate();
-    task5 = tp.allocate();
+	task2_cont_1 = tp.allocate();
+	task2_cont_2 = tp.allocate();
+	task2_cont_3 = tp.allocate();
     
     task1->_function.Bind<&test_case_4_t1_function>();
     task2->_function.Bind<&test_case_4_t2_function>();
     task3->_function.Bind<&test_case_4_t3_function>();
     task4->_function.Bind<&test_case_4_t4_function>();
-    task5->_function.Bind<&task3_function>();
+	task2_cont_1->_function.Bind<&task3_function>();
+	task2_cont_2->_function.Bind<&task3_function>();
+	task2_cont_3->_function.Bind<&task3_function>();
+
+	tp.add_as_continuation(task2, task2_cont_1);
+	tp.add_as_continuation(task2, task2_cont_2);
+	tp.add_as_continuation(task2, task2_cont_3);
 
     tp.enqueue(task1);
     tp.enqueue(task2);
     tp.enqueue(task3);
     tp.enqueue(task4);
-    
-    tp.wait_for_one(task2);
-    
-    tp.enqueue(task5);
-    
+   
     tp.wait_for_all();
+}
+
+void test_case_5_child_tasks(dw::ThreadPool& tp)
+{
+	std::cout << "*****************************************" << std::endl;
+	std::cout << "TEST CASE 5 - CHILD TASKS (TASK GROUPING)" << std::endl;
+	std::cout << "*****************************************" << std::endl;
+
+	dw::Task* parent_task;
+	dw::Task* child_tasks[10];
+
+	parent_task = tp.allocate();
+	parent_task->_function.Bind<&test_case_4_t1_function>();
+
+	for(uint32_t i = 0; i < 10; i++)
+	{
+		child_tasks[i] = tp.allocate();
+		child_tasks[i]->_function.Bind<&test_case_4_t2_function>();
+		tp.add_as_child(parent_task, child_tasks[i]);
+		tp.enqueue(child_tasks[i]);
+	}
+
+	tp.enqueue(parent_task);
+
+	tp.wait_for_one(parent_task);
 }
 
 struct TestTaskData
@@ -161,12 +200,11 @@ int main()
 
 	dw::ThreadPool thread_pool;
     
-    //test_case_2(thread_pool);
-    //test_case_1(thread_pool);
-    test_case_4(thread_pool);
-    test_case_4(thread_pool);
-    test_case_4(thread_pool);
-    test_case_4(thread_pool);
+	for(int i = 0; i < TEST_CASE_4_ITERATIONS; i++)
+		test_case_4_continuations(thread_pool);
+
+	for (int i = 0; i < TEST_CASE_5_ITERATIONS; i++)
+		test_case_5_child_tasks(thread_pool);
 
     std::cout << "*****************************************" << std::endl;
 	std::cout << "DONE ALL TEST CASES" << std::endl;
