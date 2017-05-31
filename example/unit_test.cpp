@@ -151,8 +151,8 @@ void test_case_4_continuations(dw::ThreadPool& tp)
 	task2_cont_3->_function.Bind<&task3_function>();
 
 	tp.add_as_continuation(task2, task2_cont_1);
-	tp.add_as_continuation(task2, task2_cont_2);
-	tp.add_as_continuation(task2, task2_cont_3);
+	tp.add_as_continuation(task2_cont_1, task2_cont_2);
+	tp.add_as_continuation(task2_cont_2, task2_cont_3);
 
     tp.enqueue(task1);
     tp.enqueue(task2);
