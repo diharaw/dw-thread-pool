@@ -1,6 +1,6 @@
 # dwThreadPool
 
-A simple, header-only, dependency-free, C++ 11 based ThreadPool library.
+A simple, dependency-free, C++ 11 based ThreadPool library.
 
 ## Features
 
