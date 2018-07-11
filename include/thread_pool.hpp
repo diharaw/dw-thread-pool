@@ -1,6 +1,6 @@
 #pragma once
 
-#include "delegate.hpp"
+#include <functional>
 #include "semaphore.hpp"
 #include <thread>
 #include <vector>
@@ -14,280 +14,338 @@
 
 namespace dw
 {
-    using WorkerFunction = Delegate<void(void*)>;
-    
+// -----------------------------------------------------------------------------------------------------------------------------------
+
     struct Task
     {
-        WorkerFunction		  _function;
-        char				  _data[TASK_SIZE_BYTES];
-        std::atomic<uint16_t> _num_pending;
-		Task*				  _parent;
-		std::atomic<uint16_t> _num_continuations;
-		Task*				  _continuations[MAX_CONTINUATIONS];
+        std::function<void(void*)> function;
+        char				       data[TASK_SIZE_BYTES];
+        std::atomic<uint16_t>      num_pending;
+		Task*				       parent;
+		std::atomic<uint16_t>      num_continuations;
+		Task*				       continuations[MAX_CONTINUATIONS];
     };
     
+// -----------------------------------------------------------------------------------------------------------------------------------
+    
     template <typename T>
-    inline T* task_data(Task& task)
+    inline T* task_data(Task* task)
     {
-        return (T*)(&task._data[0]);
+        return (T*)(&task->data[0]);
     }
+    
+// -----------------------------------------------------------------------------------------------------------------------------------
     
     struct WorkQueue
     {
-        std::mutex			  _critical_section;
-        Task				  _task_pool[MAX_TASKS];
-        Task*				  _task_queue[MAX_TASKS];
-        uint32_t			  _front;
-        uint32_t			  _back;
-        uint32_t			  _num_tasks;
-		std::atomic<uint32_t> _num_pending_tasks;
+        std::mutex			  m_critical_section;
+        Task				  m_task_pool[MAX_TASKS];
+        Task*				  m_task_queue[MAX_TASKS];
+        uint32_t			  m_front;
+        uint32_t			  m_back;
+        uint32_t			  m_num_tasks;
+		std::atomic<uint32_t> m_num_pending_tasks;
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         WorkQueue()
         {
-            _num_tasks = 0;
-            _num_pending_tasks = 0;
-            _front = 0;
-            _back = 0;
+            m_num_tasks = 0;
+            m_num_pending_tasks = 0;
+            m_front = 0;
+            m_back = 0;
         }
         
-        ~WorkQueue()
-        {
-            
-        }
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
+        ~WorkQueue() {}
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         Task* allocate()
         {
-            uint32_t task_index = _num_tasks++;
-            return &_task_pool[task_index & (MAX_TASKS - 1u)];
+            uint32_t task_index = m_num_tasks++;
+            return &m_task_pool[task_index & (MAX_TASKS - 1u)];
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
         void push(Task* task)
         {
-            std::lock_guard<std::mutex> lock(_critical_section);
+            std::lock_guard<std::mutex> lock(m_critical_section);
             
-            _task_queue[_back & MASK] = task;
-            ++_back;
-            _num_pending_tasks++;
+            m_task_queue[m_back & MASK] = task;
+            ++m_back;
+            m_num_pending_tasks++;
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         Task* pop()
         {
-            std::lock_guard<std::mutex> lock(_critical_section);
+            std::lock_guard<std::mutex> lock(m_critical_section);
             
-            const uint32_t job_count = _back - _front;
+            const uint32_t job_count = m_back - m_front;
             if (job_count <= 0)
                 return nullptr;
             
-            --_back;
-            return _task_queue[_back & MASK];
+            --m_back;
+            return m_task_queue[m_back & MASK];
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
         bool has_pending_tasks()
         {
-            return (_num_pending_tasks != 0);
+            return (m_num_pending_tasks != 0);
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         bool empty()
         {
-            return (_front == 0 && _back == 0);
+            return (m_front == 0 && m_back == 0);
         }
     };
     
+// -----------------------------------------------------------------------------------------------------------------------------------
+    
     struct WorkerThread
     {
-		Semaphore	_wakeup;
-        Semaphore	_done;
-        std::thread _thread;
+		Semaphore	m_wakeup;
+        Semaphore	m_done;
+        std::thread m_thread;
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
         void shutdown()
         {
             wakeup();
-            _thread.join();
+            m_thread.join();
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         void wakeup()
         {
-            _wakeup.notify();
+            m_wakeup.notify();
         }
     };
+    
+// -----------------------------------------------------------------------------------------------------------------------------------
     
     class ThreadPool
     {
     public:
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
         ThreadPool()
         {
-            _shutdown = false;
+            m_shutdown = false;
             
             // get number of logical threads on CPU
-            _num_logical_threads = std::thread::hardware_concurrency();
+            m_num_logical_threads = std::thread::hardware_concurrency();
             
-            _num_worker_threads = _num_logical_threads - 1;
+            m_num_worker_threads = m_num_logical_threads - 1;
             
 			initialize_workers();
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         ThreadPool(uint32_t workers)
         {
-            _shutdown = false;
+            m_shutdown = false;
             
             // get number of logical threads on CPU
-            _num_logical_threads = std::thread::hardware_concurrency();
-            _num_worker_threads = workers;
+            m_num_logical_threads = std::thread::hardware_concurrency();
+            m_num_worker_threads = workers;
             
 			initialize_workers();
         }
         
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
         ~ThreadPool()
         {
-			_shutdown = true;
+			m_shutdown = true;
 
-            for (uint32_t i = 0; i < _num_worker_threads; i++)
-                _worker_threads[i].shutdown();
+            for (uint32_t i = 0; i < m_num_worker_threads; i++)
+                m_worker_threads[i].shutdown();
             
-            delete[] _worker_threads;
+            delete[] m_worker_threads;
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         inline Task* allocate()
         {
-            Task* task_ptr = _queue.allocate();
-            task_ptr->_num_pending = 1;
-			task_ptr->_num_continuations = 0;
-			task_ptr->_parent = nullptr;
+            Task* task_ptr = m_queue.allocate();
+            task_ptr->num_pending = 1;
+			task_ptr->num_continuations = 0;
+			task_ptr->parent = nullptr;
             return task_ptr;
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
 		inline void add_as_child(Task* parent, Task* child)
 		{
 			if (parent && child)
 			{
-				child->_parent = parent;
-				parent->_num_pending++;
+				child->parent = parent;
+				parent->num_pending++;
 			}
 		}
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
 		inline void add_as_continuation(Task* parent, Task* continuation)
 		{
 			if (parent && continuation)
 			{
-				if (parent->_num_continuations < MAX_CONTINUATIONS)
+				if (parent->num_continuations < MAX_CONTINUATIONS)
 				{
-					parent->_continuations[parent->_num_continuations] = continuation;
-					parent->_num_continuations++;
+					parent->continuations[parent->num_continuations] = continuation;
+					parent->num_continuations++;
 				}
 			}
 		}
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
         inline void enqueue(Task* task)
         {
             if(task)
             {
-                _queue.push(task);
+                m_queue.push(task);
                 
-                for(uint32_t i = 0; i < _num_worker_threads; i++)
+                for(uint32_t i = 0; i < m_num_worker_threads; i++)
                 {
-                    WorkerThread& thread = _worker_threads[i];
+                    WorkerThread& thread = m_worker_threads[i];
                     thread.wakeup();
                 }
             }
         }
         
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
         inline void wait_for_all()
         {
-            while(_queue.has_pending_tasks())
+            while(m_queue.has_pending_tasks())
             {
-                Task* task = _queue.pop();
+                Task* task = m_queue.pop();
                 
                 if(task)
                     run_task(task);
             }
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         inline void wait_for_one(Task* pending_task)
         {
-            while(pending_task->_num_pending > 0)
+            while(pending_task->num_pending > 0)
             {
-                Task* task = _queue.pop();
+                Task* task = m_queue.pop();
                 
                 if(task)
                     run_task(task);
             }
         }
         
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
         inline uint32_t num_logical_threads()
         {
-            return _num_logical_threads;
+            return m_num_logical_threads;
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
         
         inline uint32_t num_worker_threads()
         {
-            return _num_worker_threads;
+            return m_num_worker_threads;
         }
         
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
     private:
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
         inline void initialize_workers()
         {
             // spawn worker threads
-            _worker_threads = new WorkerThread[_num_worker_threads];
+            m_worker_threads = new WorkerThread[m_num_worker_threads];
             
-            for (uint32_t i = 0; i < _num_worker_threads; i++)
-                _worker_threads[i]._thread = std::thread(&ThreadPool::worker, this, i);
+            for (uint32_t i = 0; i < m_num_worker_threads; i++)
+                m_worker_threads[i].m_thread = std::thread(&ThreadPool::worker, this, i);
         }
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
 		inline void worker(uint32_t index)
 		{
-			WorkerThread& worker_thread = _worker_threads[index];
+			WorkerThread& worker_thread = m_worker_threads[index];
 
-			while (!_shutdown)
+			while (!m_shutdown)
 			{
-				Task* task = _queue.pop();
+				Task* task = m_queue.pop();
 
 				if (!task)
 				{
-					worker_thread._done.notify();
-					worker_thread._wakeup.wait();
+					worker_thread.m_done.notify();
+					worker_thread.m_wakeup.wait();
 				}
 				else
 					run_task(task);
 			}
 		}
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
 		inline void run_task(Task* task)
 		{
 			wait_for_children(task);
 
-			task->_function.Invoke(task->_data);
+			task->function(task->data);
 
-			if (task->_parent)
-				task->_parent->_num_pending--;
+			if (task->parent)
+				task->parent->num_pending--;
 
 			// Submit continuation tasks.
-			for (uint32_t i = 0; i < task->_num_continuations; i++)
-				_queue.push(task->_continuations[i]);
+			for (uint32_t i = 0; i < task->num_continuations; i++)
+				m_queue.push(task->continuations[i]);
 
-			if (task->_num_pending > 0)
-				task->_num_pending--;
+			if (task->num_pending > 0)
+				task->num_pending--;
 
-			if (_queue._num_pending_tasks > 0)
-				_queue._num_pending_tasks--;
+			if (m_queue.m_num_pending_tasks > 0)
+				m_queue.m_num_pending_tasks--;
 		}
+        
+// -----------------------------------------------------------------------------------------------------------------------------------
 
 		inline void wait_for_children(Task* task)
 		{
-			while (task->_num_pending > 1)
+			while (task->num_pending > 1)
 			{
-				Task* wait_task = _queue.pop();
+				Task* wait_task = m_queue.pop();
 
 				if (wait_task)
 					run_task(wait_task);
 			}
 		}
         
+// -----------------------------------------------------------------------------------------------------------------------------------
+        
     private:
-        bool					  _shutdown;
-        uint32_t				  _num_logical_threads;
-        WorkQueue                 _queue;
-        WorkerThread*             _worker_threads;
-        uint32_t                  _num_worker_threads;
+        bool					  m_shutdown;
+        uint32_t				  m_num_logical_threads;
+        WorkQueue                 m_queue;
+        WorkerThread*             m_worker_threads;
+        uint32_t                  m_num_worker_threads;
     };
-
-}
+} // namespace dw

@@ -32,7 +32,7 @@ void task2_function(void* data)
 {
 	rmt_ScopedCPUSample(task2_function, 0);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(rand()));
+	std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void task3_function(void* data)
@@ -46,28 +46,28 @@ void test_case_4_t1_function(void* data)
 {
     rmt_ScopedCPUSample(Task_1, 0);
     
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void test_case_4_t2_function(void* data)
 {
     rmt_ScopedCPUSample(Task_2, 0);
     
-    std::this_thread::sleep_for(std::chrono::seconds(4));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void test_case_4_t3_function(void* data)
 {
     rmt_ScopedCPUSample(Task_3, 0);
     
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void test_case_4_t4_function(void* data)
 {
     rmt_ScopedCPUSample(Task_4, 0);
     
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 void test_case_1(dw::ThreadPool& tp)
@@ -78,7 +78,7 @@ void test_case_1(dw::ThreadPool& tp)
     
 	dw::Task* task1 = tp.allocate();
 
-	task1->_function.Bind<&task1_function>();
+    task1->function = task1_function;
 
 	for (int i = 0; i < TEST_CASE_1_NUM_TASKS; i++)
 	{
@@ -96,7 +96,7 @@ void test_case_2(dw::ThreadPool& tp)
     
 	dw::Task* task2 = tp.allocate();
 
-	task2->_function.Bind<&task2_function>();
+	task2->function = task2_function;
 
 	for (int i = 0; i < TEST_CASE_2_NUM_TASKS; i++)
 	{
@@ -110,7 +110,7 @@ void test_case_3(dw::ThreadPool& tp)
 {
 	dw::Task* task = tp.allocate();
 
-	task->_function.Bind<&task3_function>();
+	task->function = task3_function;
 
 	for (int i = 0; i < TEST_CASE_3_NUM_TASKS; i++)
 	{
@@ -142,13 +142,13 @@ void test_case_4_continuations(dw::ThreadPool& tp)
 	task2_cont_2 = tp.allocate();
 	task2_cont_3 = tp.allocate();
     
-    task1->_function.Bind<&test_case_4_t1_function>();
-    task2->_function.Bind<&test_case_4_t2_function>();
-    task3->_function.Bind<&test_case_4_t3_function>();
-    task4->_function.Bind<&test_case_4_t4_function>();
-	task2_cont_1->_function.Bind<&task3_function>();
-	task2_cont_2->_function.Bind<&task3_function>();
-	task2_cont_3->_function.Bind<&task3_function>();
+    task1->function = test_case_4_t1_function;
+    task2->function = test_case_4_t2_function;
+    task3->function = test_case_4_t3_function;
+    task4->function = test_case_4_t4_function;
+	task2_cont_1->function = task3_function;
+	task2_cont_2->function = task3_function;
+	task2_cont_3->function = task3_function;
 
 	tp.add_as_continuation(task2, task2_cont_1);
 	tp.add_as_continuation(task2_cont_1, task2_cont_2);
@@ -172,12 +172,12 @@ void test_case_5_child_tasks(dw::ThreadPool& tp)
 	dw::Task* child_tasks[10];
 
 	parent_task = tp.allocate();
-	parent_task->_function.Bind<&test_case_4_t1_function>();
+	parent_task->function = test_case_4_t1_function;
 
 	for(uint32_t i = 0; i < 10; i++)
 	{
 		child_tasks[i] = tp.allocate();
-		child_tasks[i]->_function.Bind<&test_case_4_t2_function>();
+        child_tasks[i]->function = test_case_4_t2_function;
 		tp.add_as_child(parent_task, child_tasks[i]);
 		tp.enqueue(child_tasks[i]);
 	}

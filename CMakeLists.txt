@@ -17,11 +17,10 @@ ENDIF()
 include_directories("${DWTP_INCLUDE_DIRS}" 
 					"${REMOTERY_INCLUDE_DIRS}")
 
-file(GLOB_RECURSE DWTP_SOURCE include/thread_pool.hpp
-							  include/concurrent_queue.hpp
-							  include/delegate.hpp
-						  	  example/unit_test.cpp
-						  	  external/Remotery/Remotery.c
-						  	  external/Remotery/Remotery.h)
+set(DWTP_SOURCE include/thread_pool.hpp
+				include/semaphore.hpp
+				example/unit_test.cpp
+				external/Remotery/Remotery.c
+				external/Remotery/Remotery.h)
 
 add_executable(example ${DWTP_SOURCE})
