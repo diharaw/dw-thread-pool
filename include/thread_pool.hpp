@@ -4,6 +4,7 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <algorithm>
 #include <condition_variable>
 
 #define MAX_TASKS 1024u
@@ -19,23 +20,20 @@ namespace dw
 class Semaphore
 {
 public:
-	Semaphore() : _signal(false)
-	{
-
-	}
+	Semaphore() : m_signal(false) {}
 
 	inline void notify()
 	{
-		std::unique_lock<std::mutex> lock(_mutex);
-		_signal = true;
-		_condition.notify_all();
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_signal = true;
+		m_condition.notify_all();
 	}
 
 	inline void wait()
 	{
-		std::unique_lock<std::mutex> lock(_mutex);
-		_condition.wait(lock, [&] { return _signal; });
-		_signal = false;
+		std::unique_lock<std::mutex> lock(m_mutex);
+		m_condition.wait(lock, [&] { return m_signal; });
+		m_signal = false;
 	}
 
 private:
@@ -43,9 +41,9 @@ private:
 	Semaphore(const Semaphore &);
 	Semaphore & operator = (const Semaphore &);
 
-	std::mutex              _mutex;
-	std::condition_variable _condition;
-	bool                    _signal;
+	std::mutex              m_mutex;
+	std::condition_variable m_condition;
+	bool                    m_signal;
 };
 
 // -----------------------------------------------------------------------------------------------------------------------------------
@@ -149,10 +147,18 @@ private:
 		Semaphore	m_wakeup;
         Semaphore	m_done;
         std::thread m_thread;
+		        
+// -----------------------------------------------------------------------------------------------------------------------------------
+
+		WorkerThread() {}
+
+// -----------------------------------------------------------------------------------------------------------------------------------
+
+		WorkerThread(const WorkerThread &) {}
         
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-        void shutdown()
+        ~WorkerThread()
         {
             wakeup();
             m_thread.join();
@@ -194,7 +200,7 @@ private:
             
             // get number of logical threads on CPU
             m_num_logical_threads = std::thread::hardware_concurrency();
-            m_num_worker_threads = workers;
+            m_num_worker_threads = std::min(workers, m_num_logical_threads);
             
 			initialize_workers();
         }
@@ -204,11 +210,7 @@ private:
         ~ThreadPool()
         {
 			m_shutdown = true;
-
-            for (uint32_t i = 0; i < m_num_worker_threads; i++)
-                m_worker_threads[i].shutdown();
-            
-            delete[] m_worker_threads;
+			m_worker_threads.clear();
         }
         
 // -----------------------------------------------------------------------------------------------------------------------------------
@@ -251,7 +253,7 @@ private:
 
         inline void enqueue(Task* task)
         {
-            if(task)
+            if (task)
             {
                 m_queue.push(task);
                 
@@ -271,7 +273,7 @@ private:
             {
                 Task* task = m_queue.pop();
                 
-                if(task)
+                if (task)
                     run_task(task);
             }
         }
@@ -284,7 +286,7 @@ private:
             {
                 Task* task = m_queue.pop();
                 
-                if(task)
+                if (task)
                     run_task(task);
             }
         }
@@ -312,7 +314,7 @@ private:
         inline void initialize_workers()
         {
             // spawn worker threads
-            m_worker_threads = new WorkerThread[m_num_worker_threads];
+            m_worker_threads.resize(m_num_worker_threads);
             
             for (uint32_t i = 0; i < m_num_worker_threads; i++)
                 m_worker_threads[i].m_thread = std::thread(&ThreadPool::worker, this, i);
@@ -376,10 +378,10 @@ private:
 // -----------------------------------------------------------------------------------------------------------------------------------
         
     private:
-        bool					  m_shutdown;
-        uint32_t				  m_num_logical_threads;
-        WorkQueue                 m_queue;
-        WorkerThread*             m_worker_threads;
-        uint32_t                  m_num_worker_threads;
+        bool					   m_shutdown;
+        uint32_t				   m_num_logical_threads;
+        WorkQueue                  m_queue;
+        std::vector<WorkerThread>  m_worker_threads;
+        uint32_t                   m_num_worker_threads;
     };
 } // namespace dw
