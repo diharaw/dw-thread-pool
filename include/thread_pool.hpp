@@ -264,12 +264,19 @@ private:
                 }
             }
         }
+
+// -----------------------------------------------------------------------------------------------------------------------------------
+
+		inline bool is_done(Task* task)
+		{
+			return task->num_pending == 0;
+		}
         
 // -----------------------------------------------------------------------------------------------------------------------------------
         
         inline void wait_for_all()
         {
-            while(m_queue.has_pending_tasks())
+            while (m_queue.has_pending_tasks())
             {
                 Task* task = m_queue.pop();
                 
@@ -282,7 +289,7 @@ private:
         
         inline void wait_for_one(Task* pending_task)
         {
-            while(pending_task->num_pending > 0)
+            while (pending_task->num_pending > 0)
             {
                 Task* task = m_queue.pop();
                 
