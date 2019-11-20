@@ -187,7 +187,7 @@ private:
             // get number of logical threads on CPU
             m_num_logical_threads = std::thread::hardware_concurrency();
             
-            m_num_worker_threads = m_num_logical_threads - 1;
+            m_num_worker_threads = m_num_logical_threads;
             
 			initialize_workers();
         }
