@@ -20,7 +20,6 @@ include_directories("${DWTP_INCLUDE_DIRS}"
 					"${REMOTERY_INCLUDE_DIRS}")
 
 set(DWTP_SOURCE ../include/thread_pool.hpp
-				../include/semaphore.hpp
 				../example/unit_test.cpp
 				../external/Remotery/lib/Remotery.c
 				../external/Remotery/lib/Remotery.h)

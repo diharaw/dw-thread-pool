@@ -8,6 +8,7 @@
 #include <condition_variable>
 
 #define MAX_TASKS 1024u
+#define MAX_DEPENDENCIES 16u
 #define MAX_CONTINUATIONS 16u
 #define MASK MAX_TASKS - 1u
 #define TASK_SIZE_BYTES 128
@@ -53,8 +54,9 @@ private:
         std::function<void(void*)> function;
         char				       data[TASK_SIZE_BYTES];
         std::atomic<uint16_t>      num_pending;
-		Task*				       parent;
-		std::atomic<uint16_t>      num_continuations;
+		uint16_t      num_continuations;
+        uint16_t      num_dependencies;
+        Task*                      dependencies[MAX_DEPENDENCIES];
 		Task*				       continuations[MAX_CONTINUATIONS];
     };
     
@@ -220,24 +222,21 @@ private:
             Task* task_ptr = m_queue.allocate();
             task_ptr->num_pending = 1;
 			task_ptr->num_continuations = 0;
-			task_ptr->parent = nullptr;
+			task_ptr->num_dependencies = 0;
             return task_ptr;
         }
         
 // -----------------------------------------------------------------------------------------------------------------------------------
         
-		inline void add_as_child(Task* parent, Task* child)
+		inline void define_dependency(Task* child, Task* parent)
 		{
 			if (parent && child)
-			{
-				child->parent = parent;
-				parent->num_pending++;
-			}
+				child->dependencies[child->num_dependencies++] = parent;
 		}
         
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-		inline void add_as_continuation(Task* parent, Task* continuation)
+		inline void define_continuation(Task* parent, Task* continuation)
 		{
 			if (parent && continuation)
 			{
@@ -256,7 +255,7 @@ private:
             if (task)
             {
                 m_queue.push(task);
-                
+
                 for(uint32_t i = 0; i < m_num_worker_threads; i++)
                 {
                     WorkerThread& thread = m_worker_threads[i];
@@ -351,16 +350,15 @@ private:
 
 		inline void run_task(Task* task)
 		{
-			wait_for_children(task);
+            // Wait untill all of dependent tasks are done
+            wait_for_dependencies(task);
 
+            // Execute the current task
 			task->function(task->data);
-
-			if (task->parent)
-				task->parent->num_pending--;
 
 			// Submit continuation tasks.
 			for (uint32_t i = 0; i < task->num_continuations; i++)
-				m_queue.push(task->continuations[i]);
+				enqueue(task->continuations[i]);
 
 			if (task->num_pending > 0)
 				task->num_pending--;
@@ -371,15 +369,21 @@ private:
         
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-		inline void wait_for_children(Task* task)
+		inline void wait_for_dependencies(Task* task)
 		{
-			while (task->num_pending > 1)
-			{
-				Task* wait_task = m_queue.pop();
+            if (task->num_dependencies > 0)
+            {
+                for (uint32_t i = 0; i < task->num_dependencies; i++)
+                {
+                    while (task->dependencies[i]->num_pending > 0)
+                    {
+                        Task* wait_task = m_queue.pop();
 
-				if (wait_task)
-					run_task(wait_task);
-			}
+                        if (wait_task)
+                            run_task(wait_task);
+                    }
+                }
+            }
 		}
         
 // -----------------------------------------------------------------------------------------------------------------------------------

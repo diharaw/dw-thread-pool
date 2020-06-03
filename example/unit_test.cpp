@@ -15,183 +15,103 @@
 int num_completed = 0;
 std::mutex global_mutex;
 
-void task1_function(void* data)
+void AnimationPreTransformUpdateTask(void* data)
 {
-	rmt_BeginCPUSample(task1_function, 0);
-
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-    
-    std::lock_guard<std::mutex> lock(global_mutex);
-    num_completed++;
-    std::cout << "Num Completed : " << num_completed << "/" << TEST_CASE_1_NUM_TASKS << std::endl;
-    
-    rmt_EndCPUSample();
-}
-
-void task2_function(void* data)
-{
-	rmt_ScopedCPUSample(task2_function, 0);
+    rmt_ScopedCPUSample(AnimationPreTransformUpdateTask, 0);
 
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void task3_function(void* data)
+void TransformUpdateTask(void* data)
 {
-	rmt_ScopedCPUSample(task3_function, 0);
+    rmt_ScopedCPUSample(TransformUpdateTask, 0);
 
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-}
-
-void test_case_4_t1_function(void* data)
-{
-    rmt_ScopedCPUSample(Task_1, 0);
-    
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_4_t2_function(void* data)
+void PhysicsSyncTask(void* data)
 {
-    rmt_ScopedCPUSample(Task_2, 0);
-    
+    rmt_ScopedCPUSample(PhysicsSyncTask, 0);
+
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_4_t3_function(void* data)
+void AnimationPostTransformUpdateTask(void* data)
 {
-    rmt_ScopedCPUSample(Task_3, 0);
-    
+    rmt_ScopedCPUSample(AnimationPostTransformUpdateTask, 0);
+
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_4_t4_function(void* data)
+void AudioListenerUpdateTask(void* data)
 {
-    rmt_ScopedCPUSample(Task_4, 0);
-    
+    rmt_ScopedCPUSample(AudioListenerUpdateTask, 0);
+
     std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_1(dw::ThreadPool& tp)
+void AudioSourceUpdateTask(void* data)
 {
-    std::cout << "*****************************************" << std::endl;
-    std::cout << "TEST CASE 1" << std::endl;
-    std::cout << "*****************************************" << std::endl;
-    
-	dw::Task* task1 = tp.allocate();
+    rmt_ScopedCPUSample(AudioSourceUpdateTask, 0);
 
-    task1->function = task1_function;
-
-	for (int i = 0; i < TEST_CASE_1_NUM_TASKS; i++)
-	{
-		tp.enqueue(task1);
-	}
-
-	tp.wait_for_all();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_2(dw::ThreadPool& tp)
+void ParticleUpdateTask(void* data)
 {
-    std::cout << "*****************************************" << std::endl;
-    std::cout << "TEST CASE 2" << std::endl;
-    std::cout << "*****************************************" << std::endl;
-    
-	dw::Task* task2 = tp.allocate();
+    rmt_ScopedCPUSample(ParticleUpdateTask, 0);
 
-	task2->function = task2_function;
-
-	for (int i = 0; i < TEST_CASE_2_NUM_TASKS; i++)
-	{
-		tp.enqueue(task2);
-	}
-
-	tp.wait_for_all();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_3(dw::ThreadPool& tp)
+void ScriptUpdateTask(void* data)
 {
-	dw::Task* task = tp.allocate();
+    rmt_ScopedCPUSample(ScriptUpdateTask, 0);
 
-	task->function = task3_function;
-
-	for (int i = 0; i < TEST_CASE_3_NUM_TASKS; i++)
-	{
-		tp.enqueue(task);
-	}
-
-	tp.wait_for_all();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void test_case_4_continuations(dw::ThreadPool& tp)
+void ecs_update(dw::ThreadPool& tp)
 {
-	std::cout << "*****************************************" << std::endl;
-	std::cout << "TEST CASE 4 - CONTINUATIONS" << std::endl;
-	std::cout << "*****************************************" << std::endl;
-
-    dw::Task* task1;
-    dw::Task* task2;
-    dw::Task* task3;
-    dw::Task* task4;
-    dw::Task* task2_cont_1;
-	dw::Task* task2_cont_2;
-	dw::Task* task2_cont_3;
+    dw::Task* animation_pre_transform_update_task = tp.allocate();
+    dw::Task* transform_update_task               = tp.allocate();
+    dw::Task* physics_sync_task                   = tp.allocate();
+    dw::Task* animation_post_transform_update_task = tp.allocate();
+    dw::Task* audio_listener_update_task           = tp.allocate();
+    dw::Task* audio_source_update_task             = tp.allocate();
+    dw::Task* particle_update_task                 = tp.allocate();
+    dw::Task* script_update_task                   = tp.allocate();
     
-    task1 = tp.allocate();
-    task2 = tp.allocate();
-    task3 = tp.allocate();
-    task4 = tp.allocate();
-	task2_cont_1 = tp.allocate();
-	task2_cont_2 = tp.allocate();
-	task2_cont_3 = tp.allocate();
-    
-    task1->function = test_case_4_t1_function;
-    task2->function = test_case_4_t2_function;
-    task3->function = test_case_4_t3_function;
-    task4->function = test_case_4_t4_function;
-	task2_cont_1->function = task3_function;
-	task2_cont_2->function = task3_function;
-	task2_cont_3->function = task3_function;
 
-	tp.add_as_continuation(task2, task2_cont_1);
-	tp.add_as_continuation(task2_cont_1, task2_cont_2);
-	tp.add_as_continuation(task2_cont_2, task2_cont_3);
+    animation_pre_transform_update_task->function = AnimationPreTransformUpdateTask;
+    transform_update_task->function                = TransformUpdateTask;
+    physics_sync_task->function                    = PhysicsSyncTask;
+    animation_post_transform_update_task->function = AnimationPostTransformUpdateTask;
+    audio_listener_update_task->function          = AudioListenerUpdateTask;
+    audio_source_update_task->function            = AudioSourceUpdateTask;
+    particle_update_task->function                = ParticleUpdateTask;
+    script_update_task->function                  = ScriptUpdateTask;
 
-    tp.enqueue(task1);
-    tp.enqueue(task2);
-    tp.enqueue(task3);
-    tp.enqueue(task4);
-   
+    // Continuations
+	tp.define_continuation(animation_pre_transform_update_task, transform_update_task);
+    tp.define_continuation(animation_pre_transform_update_task, physics_sync_task);
+
+    tp.define_continuation(transform_update_task, animation_post_transform_update_task);
+    tp.define_continuation(transform_update_task, audio_listener_update_task);
+    tp.define_continuation(transform_update_task, audio_source_update_task);
+    tp.define_continuation(transform_update_task, particle_update_task);
+
+    tp.define_continuation(animation_post_transform_update_task, script_update_task);
+
+    // Dependencies
+    tp.define_dependency(script_update_task, audio_listener_update_task);
+    tp.define_dependency(script_update_task, audio_source_update_task);
+    tp.define_dependency(script_update_task, particle_update_task);
+
+    tp.enqueue(animation_pre_transform_update_task);
+
     tp.wait_for_all();
 }
-
-void test_case_5_child_tasks(dw::ThreadPool& tp)
-{
-	std::cout << "*****************************************" << std::endl;
-	std::cout << "TEST CASE 5 - CHILD TASKS (TASK GROUPING)" << std::endl;
-	std::cout << "*****************************************" << std::endl;
-
-	dw::Task* parent_task;
-	dw::Task* child_tasks[10];
-
-	parent_task = tp.allocate();
-	parent_task->function = test_case_4_t1_function;
-
-	for(uint32_t i = 0; i < 10; i++)
-	{
-		child_tasks[i] = tp.allocate();
-        child_tasks[i]->function = test_case_4_t2_function;
-		tp.add_as_child(parent_task, child_tasks[i]);
-		tp.enqueue(child_tasks[i]);
-	}
-
-	tp.enqueue(parent_task);
-
-	tp.wait_for_one(parent_task);
-}
-
-struct TestTaskData
-{
-	int a;
-	float b;
-};
 
 int main()
 {
@@ -199,19 +119,12 @@ int main()
 	rmt_CreateGlobalInstance(&rmt);
 
 	dw::ThreadPool thread_pool;
-    
-	for(int i = 0; i < TEST_CASE_4_ITERATIONS; i++)
-		test_case_4_continuations(thread_pool);
 
-	for (int i = 0; i < TEST_CASE_5_ITERATIONS; i++)
-		test_case_5_child_tasks(thread_pool);
+    for (int i = 0; i < 4; i++)
+        ecs_update(thread_pool);
 
-    std::cout << "*****************************************" << std::endl;
-	std::cout << "DONE ALL TEST CASES" << std::endl;
-    std::cout << "*****************************************" << std::endl;
-
-	int a;
-	std::cin >> a;
+    int a;
+    std::cin >> a;
     
     rmt_DestroyGlobalInstance(rmt);
 
